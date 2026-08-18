@@ -40,24 +40,20 @@ Set at least:
 ```env
 NODE_ENV=production
 ADMIN_PASSWORD=...
-ENCRYPTION_KEY=...          # long random string
+ENCRYPTION_KEY=...
 POSTGRES_PASSWORD=...
 CORS_ORIGIN=https://erp-demo.fybud.com
 VITE_API_BASE_URL=https://api.erp-demo.fybud.com
-FRONTEND_HOST=erp-demo.fybud.com
-BACKEND_HOST=api.erp-demo.fybud.com
 ACME_EMAIL=admin@fybud.com
 ```
 
-3. Start with TLS (Caddy):
+3. One command — start stack, issue certificates, enable HTTPS:
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+./scripts/enable-prod.sh
 ```
 
-Caddy issues Let's Encrypt certificates for both hosts. Ports 80 and 443 must be open. Postgres and Redis stay private to the compose network.
-
-Rebuild the frontend after changing `VITE_API_BASE_URL` (`docker compose ... up -d --build frontend`).
+Nginx configs live in `nginx/`. Ports 80 and 443 must be open. Postgres and Redis stay private. Rebuild the frontend after changing `VITE_API_BASE_URL`.
 
 ## Local development (without Docker frontend/backend)
 

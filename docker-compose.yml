@@ -1,5 +1,5 @@
 # Local:  docker compose up --build
-# Prod:   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+# Prod:   ./scripts/enable-prod.sh
 #
 # Copy .env.example → .env and set ADMIN_PASSWORD / ENCRYPTION_KEY / POSTGRES_PASSWORD.
 
