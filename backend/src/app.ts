@@ -15,7 +15,13 @@ export function createApp() {
   );
   app.use(
     cors({
-      origin: env.corsOrigin === "*" ? true : env.corsOrigin.split(","),
+      origin:
+        env.corsOrigin === "*"
+          ? true
+          : env.corsOrigin
+              .split(",")
+              .map((origin) => origin.trim())
+              .filter(Boolean),
     })
   );
   app.use(express.json({ limit: "5mb" }));

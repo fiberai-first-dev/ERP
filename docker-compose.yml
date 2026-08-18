@@ -1,24 +1,27 @@
+# Local:  docker compose up --build
+# Prod:   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# Copy .env.example → .env and set ADMIN_PASSWORD / ENCRYPTION_KEY / POSTGRES_PASSWORD.
+
 services:
   db:
     image: postgres:16-alpine
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: oms
-      POSTGRES_PASSWORD: oms_secret
-      POSTGRES_DB: oms
-    ports:
-      - "5432:5432"
+      POSTGRES_USER: ${POSTGRES_USER:-oms}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-oms_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-oms}
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U oms -d oms"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-oms} -d ${POSTGRES_DB:-oms}"]
       interval: 5s
       timeout: 5s
       retries: 10
 
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
+    restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -27,31 +30,55 @@ services:
 
   backend:
     build: ./backend
-    env_file:
-      - ./backend/.env
+    restart: unless-stopped
     environment:
-      # Override localhost hosts from backend/.env for Compose networking
-      DATABASE_URL: postgresql://oms:oms_secret@db:5432/oms
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: "4000"
+      DATABASE_URL: postgresql://${POSTGRES_USER:-oms}:${POSTGRES_PASSWORD:-oms_secret}@db:5432/${POSTGRES_DB:-oms}
       REDIS_URL: redis://redis:6379
-      # Local/demo: Connect works without live marketplace API credentials
-      MOCK_CHANNELS: "true"
-    ports:
-      - "4000:4000"
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-12345}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-dev-encryption-key-change-me-32b}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173,http://localhost:3000,https://erp-demo.fybud.com}
+      MOCK_CHANNELS: ${MOCK_CHANNELS:-false}
+      SIMULATION_MODE: ${SIMULATION_MODE:-true}
+      SYNC_CRON: ${SYNC_CRON:-*/5 * * * *}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    volumes:
+      - backend_uploads:/app/uploads
+    expose:
+      - "4000"
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:4000/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
 
   frontend:
     build:
       context: ./frontend
       args:
-        VITE_API_BASE_URL: ""
-    ports:
-      - "3000:80"
+        # Local: empty → nginx proxies /api to backend
+        # Prod:  https://api.erp-demo.fybud.com
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
+    restart: unless-stopped
+    expose:
+      - "80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
 
 volumes:
   pgdata:
+  backend_uploads:

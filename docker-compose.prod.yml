@@ -1,0 +1,47 @@
+# Production: erp-demo.fybud.com (app) + api.erp-demo.fybud.com (API)
+# docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+
+services:
+  db:
+    restart: unless-stopped
+
+  redis:
+    restart: unless-stopped
+
+  backend:
+    environment:
+      NODE_ENV: production
+      CORS_ORIGIN: ${CORS_ORIGIN:-https://erp-demo.fybud.com,https://api.erp-demo.fybud.com}
+      MOCK_CHANNELS: ${MOCK_CHANNELS:-false}
+      SIMULATION_MODE: ${SIMULATION_MODE:-true}
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-https://api.erp-demo.fybud.com}
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      FRONTEND_HOST: ${FRONTEND_HOST:-erp-demo.fybud.com}
+      BACKEND_HOST: ${BACKEND_HOST:-api.erp-demo.fybud.com}
+      ACME_EMAIL: ${ACME_EMAIL:-admin@fybud.com}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_started
+
+volumes:
+  caddy_data:
+  caddy_config:
