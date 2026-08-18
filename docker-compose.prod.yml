@@ -13,6 +13,7 @@ services:
     environment:
       NODE_ENV: production
       CORS_ORIGIN: ${CORS_ORIGIN:-https://erp-demo.fybud.com,https://api.erp-demo.fybud.com}
+      PUBLIC_API_URL: ${PUBLIC_API_URL:-https://api.erp-demo.fybud.com}
       MOCK_CHANNELS: ${MOCK_CHANNELS:-false}
       SIMULATION_MODE: ${SIMULATION_MODE:-true}
     ports:

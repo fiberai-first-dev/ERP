@@ -63,6 +63,24 @@ const memory = {
   fulfillments: new Map<number, ShopifyFulfillmentRaw>(),
 };
 
+function toShopifyImageSrc(imageUrl?: string | null): string | undefined {
+  if (!imageUrl?.trim()) return undefined;
+  let url = imageUrl.trim();
+  if (url.startsWith("data:")) return undefined;
+  if (url.startsWith("/")) {
+    if (!env.publicApiUrl) return undefined;
+    url = `${env.publicApiUrl}${url}`;
+  }
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:") return undefined;
+    if (["localhost", "127.0.0.1"].includes(parsed.hostname)) return undefined;
+    return parsed.toString();
+  } catch {
+    return undefined;
+  }
+}
+
 export class ShopifyClient {
   constructor(private credentials: AdapterCredentials) {}
 
@@ -338,41 +356,20 @@ export class ShopifyClient {
     }
 
     const found = await this.findVariantBySku(input.sku);
-    if (found) {
-      await this.shopifyFetch(`/products/${found.productId}.json`, {
-        method: "PUT",
-        body: JSON.stringify({
-          product: {
-            id: found.productId,
-            title: input.name,
-            body_html: input.description || "",
-            variants: [
-              {
-                id: found.variantId,
-                price: String(input.price),
-                sku: input.sku,
-                inventory_management: "shopify",
-              },
-            ],
-            ...(input.imageUrl
-              ? {
-                  images: [{ src: input.imageUrl }],
-                }
-              : {}),
-          },
-        }),
-      });
-      await this.updateInventory(input.sku, input.quantity);
-      return;
-    }
-
-    await this.shopifyFetch("/products.json", {
-      method: "POST",
-      body: JSON.stringify({
-        product: {
-          title: input.name,
-          body_html: input.description || "",
-          variants: [
+    const imageSrc = toShopifyImageSrc(input.imageUrl);
+    const productBody = (includeImage: boolean) => ({
+      title: input.name,
+      body_html: input.description || "",
+      variants: found
+        ? [
+            {
+              id: found.variantId,
+              price: String(input.price),
+              sku: input.sku,
+              inventory_management: "shopify",
+            },
+          ]
+        : [
             {
               price: String(input.price),
               sku: input.sku,
@@ -380,16 +377,36 @@ export class ShopifyClient {
               inventory_quantity: input.quantity,
             },
           ],
-          ...(input.imageUrl
-            ? {
-                images: [{ src: input.imageUrl }],
-              }
-            : {}),
-        },
-      }),
+      ...(includeImage && imageSrc ? { images: [{ src: imageSrc }] } : {}),
     });
 
-    // Ensure quantity is set via inventory levels (create path can be flaky across API versions).
+    const send = async (includeImage: boolean) => {
+      if (found) {
+        await this.shopifyFetch(`/products/${found.productId}.json`, {
+          method: "PUT",
+          body: JSON.stringify({
+            product: { id: found.productId, ...productBody(includeImage) },
+          }),
+        });
+        return;
+      }
+      await this.shopifyFetch("/products.json", {
+        method: "POST",
+        body: JSON.stringify({ product: productBody(includeImage) }),
+      });
+    };
+
+    try {
+      await send(Boolean(imageSrc));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+      if (imageSrc && /image url is invalid/i.test(message)) {
+        await send(false);
+      } else {
+        throw error;
+      }
+    }
+
     await this.updateInventory(input.sku, input.quantity);
   }
 
