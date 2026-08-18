@@ -47,13 +47,19 @@ VITE_API_BASE_URL=https://api.erp-demo.fybud.com
 ACME_EMAIL=admin@fybud.com
 ```
 
-3. One command — start stack, issue certificates, enable HTTPS:
+3. Start the app (host nginx already owns 80/443):
 
 ```bash
-./scripts/enable-prod.sh
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 ```
 
-Nginx configs live in `nginx/`. Ports 80 and 443 must be open. Postgres and Redis stay private. Rebuild the frontend after changing `VITE_API_BASE_URL`.
+4. Copy site files, enable them, and create certificates with the VM certbot:
+
+```bash
+sudo ./scripts/enable-nginx.sh
+```
+
+Nginx files are in `nginx/`. Docker only publishes `127.0.0.1:3000` (frontend) and `127.0.0.1:4000` (backend). Rebuild the frontend after changing `VITE_API_BASE_URL`.
 
 ## Local development (without Docker frontend/backend)
 

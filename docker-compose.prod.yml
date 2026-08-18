@@ -1,6 +1,6 @@
-# Production: erp-demo.fybud.com (app) + api.erp-demo.fybud.com (API)
-# One command (issues TLS certs + starts stack):
-#   ./scripts/enable-prod.sh
+# Production overlay: env + bind app ports for host nginx (80/443 stay on the VM).
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#   sudo ./scripts/enable-nginx.sh
 
 services:
   db:
@@ -15,40 +15,13 @@ services:
       CORS_ORIGIN: ${CORS_ORIGIN:-https://erp-demo.fybud.com,https://api.erp-demo.fybud.com}
       MOCK_CHANNELS: ${MOCK_CHANNELS:-false}
       SIMULATION_MODE: ${SIMULATION_MODE:-true}
+    ports:
+      - "127.0.0.1:4000:4000"
 
   frontend:
     build:
       context: ./frontend
       args:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-https://api.erp-demo.fybud.com}
-
-  nginx:
-    image: nginx:1.27-alpine
-    restart: unless-stopped
     ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/erp-demo.fybud.com.conf:/etc/nginx/conf.d/erp-demo.fybud.com.conf:ro
-      - ./nginx/api.erp-demo.fybud.com.conf:/etc/nginx/conf.d/api.erp-demo.fybud.com.conf:ro
-      - certbot_etc:/etc/letsencrypt
-      - certbot_www:/var/www/certbot
-    depends_on:
-      backend:
-        condition: service_healthy
-      frontend:
-        condition: service_started
-
-  certbot:
-    image: certbot/certbot
-    restart: unless-stopped
-    volumes:
-      - certbot_etc:/etc/letsencrypt
-      - certbot_www:/var/www/certbot
-    entrypoint: /bin/sh
-    command: -c "trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h; done"
-
-volumes:
-  certbot_etc:
-  certbot_www:
+      - "127.0.0.1:3000:80"

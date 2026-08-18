@@ -1,5 +1,6 @@
 # Local:  docker compose up --build
-# Prod:   ./scripts/enable-prod.sh
+# Prod:   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#         sudo ./scripts/enable-nginx.sh
 #
 # Copy .env.example → .env and set ADMIN_PASSWORD / ENCRYPTION_KEY / POSTGRES_PASSWORD.
 
